@@ -161,7 +161,7 @@ export default function Accounts() {
           onClick={() => { setShowManual(!showManual); setEditId(null); setForm(EMPTY_FORM); }}
           className="text-text-muted text-xs hover:text-text-secondary flex items-center gap-1.5"
         >
-          <Plus size={13} /> Add manually
+          <Plus size={13} /> ربط يدوي بدون Meta App
         </button>
         <div className="flex-1 h-px bg-border" />
       </div>
@@ -170,9 +170,26 @@ export default function Accounts() {
       {showManual && (
         <div className="card border-border/80 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-text-primary text-sm">{editId ? 'Edit Account' : 'Add Account Manually'}</h2>
+            <h2 className="font-semibold text-text-primary text-sm">{editId ? 'تعديل حساب' : 'ربط حساب يدوياً'}</h2>
             <button onClick={() => { setShowManual(false); setError(''); }} className="text-text-muted hover:text-text-primary"><X size={16} /></button>
           </div>
+
+          {/* Instagram Guide */}
+          {form.platform === 'instagram' && !editId && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 space-y-2 text-sm">
+              <div className="font-medium text-blue-300">كيف تجيب بيانات Instagram؟</div>
+              <ol className="text-text-muted space-y-1 list-decimal list-inside text-xs leading-relaxed">
+                <li>افتح <strong className="text-text-secondary">developers.facebook.com</strong> وسجّل دخول</li>
+                <li>اختار تطبيقك → <strong className="text-text-secondary">Tools → Graph API Explorer</strong></li>
+                <li>من "User or Page" اختار <strong className="text-text-secondary">Page Access Token</strong></li>
+                <li>اختار الـ Page المربوطة بالإنستجرام</li>
+                <li>في الـ Query اكتب: <code className="bg-bg-tertiary px-1 rounded">/me?fields=instagram_business_account</code></li>
+                <li>انسخ الـ <strong className="text-text-secondary">instagram_business_account id</strong> → Account ID</li>
+                <li>انسخ الـ <strong className="text-text-secondary">Access Token</strong> من الأعلى</li>
+              </ol>
+            </div>
+          )}
+
           {error && <div className="bg-red-500/15 border border-red-500/30 text-red-400 text-sm px-3 py-2 rounded-lg">{error}</div>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -183,16 +200,16 @@ export default function Accounts() {
               </select>
             </div>
             <div>
-              <label className="label">Username</label>
+              <label className="label">اسم المستخدم</label>
               <input className="input" placeholder="@username" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
             </div>
             <div>
-              <label className="label">Account ID</label>
+              <label className="label">Account ID {form.platform === 'instagram' ? '(Instagram Business ID)' : '(Open ID)'}</label>
               <input className="input" placeholder="123456789" value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })} />
             </div>
             {form.platform === 'instagram' && (
               <div>
-                <label className="label">Page ID</label>
+                <label className="label">Page ID (اختياري)</label>
                 <input className="input" placeholder="Facebook Page ID" value={form.page_id} onChange={e => setForm({ ...form, page_id: e.target.value })} />
               </div>
             )}
@@ -202,10 +219,10 @@ export default function Accounts() {
             </div>
           </div>
           <div className="flex gap-3 justify-end">
-            <button onClick={() => { setShowManual(false); setError(''); }} className="btn-secondary text-sm">Cancel</button>
+            <button onClick={() => { setShowManual(false); setError(''); }} className="btn-secondary text-sm">إلغاء</button>
             <button onClick={save} disabled={loading} className="btn-primary text-sm flex items-center gap-2">
               {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check size={14} />}
-              {editId ? 'Update' : 'Add'}
+              {editId ? 'تحديث' : 'إضافة'}
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const WS_URL = 'ws://localhost:7654';
+const WS_URL = 'ws://127.0.0.1:7655';
 
 export function useVoiceAgent() {
   const [orbState, setOrbState] = useState('idle');
