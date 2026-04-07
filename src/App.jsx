@@ -7,10 +7,17 @@ import Rules from './pages/Rules';
 import Activity from './pages/Activity';
 import Settings from './pages/Settings';
 import Webhooks from './pages/Webhooks';
+import Privacy from './pages/Privacy';
+import DataDeletion from './pages/DataDeletion';
 
 export default function App() {
   return (
     <Routes>
+      {/* Public pages (no sidebar) */}
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/data-deletion" element={<DataDeletion />} />
+
+      {/* App pages (with sidebar) */}
       <Route path="/" element={<Layout />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
