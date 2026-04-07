@@ -1,178 +1,140 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const API_BASE  = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '') + '/api';
-const WS_LOCAL  = 'ws://localhost:7654';
-const GREET_TXT = 'أهلاً بك سيدي! بماذا تأمر؟';
+const API   = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '') + '/api';
+const WS    = 'ws://localhost:7654';
+const GREET = 'أهلاً بك سيدي! بماذا تأمر؟';
 
 export function useVoiceAgent() {
-  const [orbState, setOrbState] = useState('idle');
+  const [orbState, setOrbState] = useState('idle');   // idle|ready|listening|thinking|speaking|error
   const [orbText,  setOrbText]  = useState('');
 
-  const recRef      = useRef(null);
-  const activeRef   = useRef(false);
-  const historyRef  = useRef([]);       // conversation history
-  const activateRef = useRef(null);
-  const wsRef       = useRef(null);
+  const recRef     = useRef(null);
+  const activeRef  = useRef(false);
+  const histRef    = useRef([]);
+  const actRef     = useRef(null);   // للـ WS handler
 
   // ── TTS ──────────────────────────────────────────────────────────────────
   const speak = useCallback((text, onDone) => {
-    const synth = window.speechSynthesis;
-    synth.cancel();
+    const s = window.speechSynthesis;
+    s.cancel();
 
-    // انتظر تحميل الأصوات
-    const doSpeak = () => {
-      const utt   = new SpeechSynthesisUtterance(text);
-      utt.lang    = 'ar-EG';
-      utt.rate    = 0.92;
-      utt.pitch   = 1.0;
-      utt.volume  = 1.0;
+    const go = () => {
+      const u    = new SpeechSynthesisUtterance(text);
+      u.lang     = 'ar-EG';
+      u.rate     = 0.92;
+      u.volume   = 1;
 
-      const voices  = synth.getVoices();
-      const arVoice = voices.find(v => /ar[-_]EG/i.test(v.lang))
-                   || voices.find(v => v.lang.startsWith('ar'))
-                   || voices.find(v => /arab/i.test(v.name));
-      if (arVoice) utt.voice = arVoice;
+      const voices = s.getVoices();
+      u.voice = voices.find(v => /ar[-_]EG/i.test(v.lang))
+             || voices.find(v => v.lang.startsWith('ar'))
+             || null;
 
-      utt.onstart = () => { setOrbState('speaking'); setOrbText(text); };
-      utt.onend   = () => { if (onDone) onDone(); };
-      utt.onerror = () => { if (onDone) onDone(); };  // مش شغال → كمّل
+      u.onstart = () => { setOrbState('speaking'); setOrbText(text); };
+      u.onend   = () => onDone?.();
+      u.onerror = () => onDone?.();
+      s.speak(u);
 
-      synth.speak(utt);
-
-      // Chrome pause bug fix
+      // Chrome pause bug
       const t = setInterval(() => {
-        if (synth.paused) synth.resume();
-        if (!synth.speaking) clearInterval(t);
+        if (s.paused) s.resume();
+        if (!s.speaking) clearInterval(t);
       }, 400);
     };
 
-    if (synth.getVoices().length > 0) {
-      doSpeak();
-    } else {
-      synth.onvoiceschanged = () => { synth.onvoiceschanged = null; doSpeak(); };
-    }
+    s.getVoices().length ? go() : (s.onvoiceschanged = () => { s.onvoiceschanged = null; go(); });
   }, []);
 
   // ── STT ──────────────────────────────────────────────────────────────────
-  const startListening = useCallback(() => {
+  const listen = useCallback(() => {
     if (!activeRef.current) return;
-
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setOrbState('error');
-      setOrbText('Chrome مطلوب للتعرف على الصوت');
-      return;
-    }
+    if (!SR) { setOrbState('error'); setOrbText('Chrome مطلوب'); return; }
 
     try { recRef.current?.stop(); } catch {}
     const r = new SR();
-    r.lang = 'ar-EG';
-    r.continuous      = false;
-    r.interimResults  = false;
-    r.maxAlternatives = 1;
+    r.lang = 'ar-EG'; r.continuous = false; r.interimResults = false;
     recRef.current = r;
+    setOrbState('listening'); setOrbText('');
 
-    setOrbState('listening');
-    setOrbText('');
-
-    r.onresult = (e) => {
-      const cmd = e.results[0][0].transcript.trim();
-      if (cmd) handleCommand(cmd);
-    };
-
-    r.onerror = (e) => {
-      if (e.error === 'no-speech' && activeRef.current) {
-        setTimeout(startListening, 300);
-      } else if (!['aborted','interrupted'].includes(e.error)) {
-        setOrbState('error');
-        setOrbText('تأكد من إذن الميكروفون في Chrome');
+    r.onresult = e => { const c = e.results[0][0].transcript.trim(); if (c) onCmd(c); };
+    r.onerror  = e => {
+      if (e.error === 'no-speech' && activeRef.current) setTimeout(listen, 200);
+      else if (!['aborted','interrupted'].includes(e.error)) {
+        setOrbState('error'); setOrbText('تأكد من إذن الميكروفون');
       }
     };
-
     try { r.start(); } catch {}
   }, []);
 
   // ── معالجة الأوامر ────────────────────────────────────────────────────────
-  const handleCommand = useCallback(async (cmd) => {
+  const onCmd = useCallback(async cmd => {
     if (!activeRef.current) return;
 
-    // إغلاق
     if (/خروج|إغلاق|انتهى|باي|وداع|كفاية|stop/i.test(cmd)) {
-      activeRef.current = false;
-      historyRef.current = [];
+      activeRef.current = false; histRef.current = [];
       speak('في أمان الله سيدي!', () => { setOrbState('idle'); setOrbText(''); });
       return;
     }
 
-    setOrbState('thinking');
-    setOrbText(cmd);
+    setOrbState('thinking'); setOrbText(cmd);
 
     try {
-      const res  = await fetch(`${API_BASE}/settings/chat`, {
+      const r = await fetch(`${API}/activity/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd, history: historyRef.current }),
+        body: JSON.stringify({ command: cmd, history: histRef.current }),
       });
-      const data = await res.json();
-      const reply = data.response || '...';
-
-      // حفظ في التاريخ
-      historyRef.current = [
-        ...historyRef.current.slice(-8),
-        { role: 'user',      content: cmd   },
-        { role: 'assistant', content: reply },
-      ];
-
-      speak(reply, () => { if (activeRef.current) startListening(); });
+      const d = await r.json();
+      const reply = d.response || '...';
+      histRef.current = [...histRef.current.slice(-8),
+        { role:'user', content:cmd }, { role:'assistant', content:reply }];
+      speak(reply, () => { if (activeRef.current) listen(); });
     } catch {
-      speak('تعذّر الاتصال بالسيرفر.', () => { if (activeRef.current) startListening(); });
+      speak('تعذّر الاتصال.', () => { if (activeRef.current) listen(); });
     }
-  }, [speak, startListening]);
+  }, [speak, listen]);
 
-  // ── تفعيل الجلسة ─────────────────────────────────────────────────────────
+  // ── تفعيل (مع user gesture) ───────────────────────────────────────────────
   const activate = useCallback(() => {
     if (activeRef.current) return;
-    activeRef.current  = true;
-    historyRef.current = [];
+    activeRef.current = true; histRef.current = [];
+    setOrbState('speaking'); setOrbText(GREET);
+    speak(GREET, () => listen());
+  }, [speak, listen]);
 
-    // أظهر الـ Orb فوراً
-    setOrbState('speaking');
-    setOrbText(GREET_TXT);
-
-    // تكلم - بعدها ابدأ تسمع
-    speak(GREET_TXT, () => startListening());
-  }, [speak, startListening]);
+  // ── ready: يظهر الـ orb بدون كلام (من التصفيق) ──────────────────────────
+  const ready = useCallback(() => {
+    if (activeRef.current) return;
+    setOrbState('ready'); setOrbText('');
+  }, []);
 
   const deactivate = useCallback(() => {
     activeRef.current = false;
     window.speechSynthesis.cancel();
     try { recRef.current?.stop(); } catch {}
-    setOrbState('idle');
-    setOrbText('');
+    setOrbState('idle'); setOrbText('');
   }, []);
 
-  useEffect(() => { activateRef.current = activate; }, [activate]);
+  useEffect(() => { actRef.current = { activate, ready }; }, [activate, ready]);
 
   // ── WebSocket ─────────────────────────────────────────────────────────────
   useEffect(() => {
     let ws, retry;
-
-    function connect() {
+    const connect = () => {
       try {
-        ws = new WebSocket(WS_LOCAL);
-        wsRef.current = ws;
-        ws.onopen    = () => console.log('[WS] Connected');
-        ws.onclose   = () => { retry = setTimeout(connect, 4000); };
-        ws.onerror   = () => ws.close();
-        ws.onmessage = (e) => {
+        ws = new WebSocket(WS);
+        ws.onopen  = () => console.log('[WS] connected');
+        ws.onclose = () => { retry = setTimeout(connect, 4000); };
+        ws.onerror = () => ws.close();
+        ws.onmessage = e => {
           try {
-            const msg = JSON.parse(e.data);
-            if (msg.type === 'activate') activateRef.current?.();
+            const m = JSON.parse(e.data);
+            // من التصفيق → أظهر الـ orb في وضع ready فقط
+            if (m.type === 'activate') actRef.current?.ready();
           } catch {}
         };
       } catch { retry = setTimeout(connect, 4000); }
-    }
-
+    };
     connect();
     return () => { clearTimeout(retry); try { ws?.close(); } catch {} };
   }, []);
