@@ -56,8 +56,10 @@ export default function Accounts() {
 
   const connectInstagram = () => {
     if (!settings.meta_app_id || settings.meta_app_id === '') {
-      alert('Please configure your Meta App ID in Settings first.');
-      window.location.href = '/settings';
+      // No Meta App ID — open manual form directly
+      setForm({ ...EMPTY_FORM, platform: 'instagram' });
+      setEditId(null);
+      setShowManual(true);
       return;
     }
     window.location.href = `${BACKEND_URL}/api/oauth/instagram/connect`;
