@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Zap, Activity, Settings, Webhook,
   Menu, X, Brain, ChevronRight
 } from 'lucide-react';
 import clsx from 'clsx';
+import VoiceOrb from './VoiceOrb';
+import { useVoiceAgent } from '../hooks/useVoiceAgent';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,6 +19,7 @@ const navItems = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { orbState, orbText, activate, deactivate } = useVoiceAgent();
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg-primary">
@@ -101,6 +104,14 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      {/* ─── Mindy Voice Orb ─── */}
+      <VoiceOrb
+        state={orbState}
+        text={orbText}
+        onClose={deactivate}
+        onManualActivate={activate}
+      />
     </div>
   );
 }

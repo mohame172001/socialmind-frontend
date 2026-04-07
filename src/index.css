@@ -54,3 +54,92 @@ body {
     @apply bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full border border-blue-500/30;
   }
 }
+
+/* ═══════════════════════════════════════
+   Voice Orb Animations
+═══════════════════════════════════════ */
+
+/* زر الـ idle - تنفس بطيء */
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(79,110,247,0.4); }
+  50%       { transform: scale(1.08); box-shadow: 0 0 0 12px rgba(79,110,247,0); }
+}
+.orb-breathe { animation: orb-breathe 3s ease-in-out infinite; }
+
+/* حلقات الاستماع */
+@keyframes orb-ring-pulse {
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.orb-ring { position: absolute; border-radius: 9999px; animation: orb-ring-pulse 2s ease-out infinite; }
+.orb-ring-1 { animation-delay: 0s; }
+.orb-ring-2 { animation-delay: 0.4s; }
+.orb-ring-3 { animation-delay: 0.8s; }
+
+/* حلقة الـ thinking - دوران */
+@keyframes orb-spin {
+  to { transform: rotate(360deg); }
+}
+.orb-spin-ring {
+  background: conic-gradient(from 0deg, transparent 0%, #8b5cf6 40%, #4f6ef7 60%, transparent 100%);
+  animation: orb-spin 1.2s linear infinite;
+  border-radius: 9999px;
+}
+
+/* الكرة - listening */
+.orb-listening {
+  background: radial-gradient(circle at 35% 35%, #60a5fa, #2563eb, #1e3a8a);
+  animation: orb-breathe 0.8s ease-in-out infinite;
+}
+
+/* الكرة - thinking */
+@keyframes orb-think-bg {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.orb-thinking {
+  background: linear-gradient(135deg, #7c3aed, #4f6ef7, #8b5cf6, #6d28d9);
+  background-size: 300% 300%;
+  animation: orb-think-bg 1.5s ease infinite;
+}
+
+/* الكرة - speaking */
+@keyframes orb-speak-pulse {
+  0%, 100% { transform: scale(1); }
+  25%       { transform: scale(1.06); }
+  75%       { transform: scale(0.96); }
+}
+.orb-speaking {
+  background: radial-gradient(circle at 35% 35%, #67e8f9, #0891b2, #164e63);
+  animation: orb-speak-pulse 0.6s ease-in-out infinite;
+}
+
+/* موجة داخلية */
+@keyframes inner-wave {
+  0%   { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+.orb-inner-wave {
+  background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+  animation: inner-wave 1s ease-out infinite;
+}
+
+/* الكرة - error */
+.orb-error {
+  background: radial-gradient(circle at 35% 35%, #f87171, #dc2626, #7f1d1d);
+}
+
+/* نقاط الـ thinking */
+@keyframes dots {
+  0%, 80%, 100% { opacity: 0.3; }
+  40%           { opacity: 1; }
+}
+.orb-dots { letter-spacing: 4px; animation: dots 1.4s ease-in-out infinite; }
+
+/* أعمدة الصوت */
+@keyframes sound-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50%       { transform: scaleY(1); }
+}
+.sound-bar { animation: sound-bar 0.8s ease-in-out infinite; transform-origin: bottom; }
