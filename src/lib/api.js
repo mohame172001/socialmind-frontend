@@ -38,6 +38,7 @@ export const api = {
 
   // Settings
   getSettings: () => request('GET', '/settings'),
+  getConfigStatus: () => request('GET', '/settings/status'),
   updateSettings: (data) => request('PUT', '/settings', data),
   testAI: () => request('GET', '/settings/test-ai'),
 

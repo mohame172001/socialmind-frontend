@@ -46,22 +46,28 @@ export default function Accounts() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({});
+  const [configStatus, setConfigStatus] = useState(null);
 
   const load = () => api.getAccounts().then(setAccounts).catch(console.error);
 
   useEffect(() => {
     load();
     api.getSettings().then(setSettings).catch(console.error);
+    // Fetch config status (checks ENV vars + DB)
+    fetch(`${BACKEND_URL}/api/settings/status`).then(r => r.json()).then(setConfigStatus).catch(console.error);
   }, []);
 
+  const oauthReady = configStatus?.oauth_ready;
+
   const connectInstagram = () => {
-    if (!settings.meta_app_id || settings.meta_app_id === '') {
-      // No Meta App ID — open manual form directly
+    if (!oauthReady) {
+      // OAuth not configured — show manual form with clear message
       setForm({ ...EMPTY_FORM, platform: 'instagram' });
       setEditId(null);
       setShowManual(true);
       return;
     }
+    // OAuth is ready — redirect to Meta login
     window.location.href = `${BACKEND_URL}/api/oauth/instagram/connect`;
   };
 
@@ -125,11 +131,16 @@ export default function Accounts() {
                 Connect Instagram
                 <Link size={14} className="text-pink-400 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <div className="text-text-muted text-xs mt-0.5">One-click via Meta OAuth</div>
+              <div className="text-text-muted text-xs mt-0.5">
+                {oauthReady ? '✅ One-click via Meta OAuth' : '⚙️ Manual setup (set Meta App ID in Settings for OAuth)'}
+              </div>
             </div>
           </div>
           <div className="mt-3 text-xs text-text-muted">
-            Requires: Instagram Business/Creator account linked to a Facebook Page
+            {oauthReady
+              ? 'Requires: Instagram Business/Creator account linked to a Facebook Page'
+              : <>⚠️ META_APP_ID not configured. <a href="/settings" className="text-accent-blue underline">Go to Settings</a> or set ENV var.</>
+            }
           </div>
         </button>
 

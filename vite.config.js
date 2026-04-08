@@ -7,7 +7,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': { target: 'http://localhost:3001', changeOrigin: true },
-      '/webhooks': { target: 'http://localhost:3001', changeOrigin: true }
+      '/webhooks/instagram': { target: 'http://localhost:3001', changeOrigin: true },
+      '/webhooks/tiktok': { target: 'http://localhost:3001', changeOrigin: true }
     }
   },
   build: {
