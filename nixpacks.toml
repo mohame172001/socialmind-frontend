@@ -5,7 +5,7 @@ nixPkgs = ["nodejs_22"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["VITE_API_URL=https://sparkling-vitality-production-d3d5.up.railway.app/api npm run build"]
+cmds = ["npm run build"]
 
 [start]
 cmd = "npx serve dist -s --listen $PORT --no-clipboard"
