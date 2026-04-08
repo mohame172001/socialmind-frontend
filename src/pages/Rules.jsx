@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Edit2, Zap, X, Check, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, Zap, X, Check, ToggleLeft, ToggleRight, Image, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
 
 const EMPTY = {
   account_id: '', name: '', trigger_type: 'any', keywords: '',
-  action_type: 'reply_comment', comment_template: '', dm_template: ''
+  action_type: 'reply_comment', comment_template: '', dm_template: '',
+  target_media_id: ''
 };
 
 export default function Rules() {
@@ -15,6 +16,20 @@ export default function Rules() {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [media, setMedia] = useState([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+
+  const loadMedia = async (accountId) => {
+    if (!accountId) { setMedia([]); return; }
+    const acc = accounts.find(a => a.id === accountId);
+    if (!acc || acc.platform !== 'instagram') { setMedia([]); return; }
+    setMediaLoading(true);
+    try {
+      const posts = await api.getAccountMedia(accountId);
+      setMedia(posts);
+    } catch { setMedia([]); }
+    finally { setMediaLoading(false); }
+  };
 
   const load = async () => {
     const [r, a] = await Promise.all([api.getRules(), api.getAccounts()]);
@@ -27,7 +42,8 @@ export default function Rules() {
     try {
       const payload = {
         ...form,
-        keywords: form.keywords ? form.keywords.split(',').map(k => k.trim()).filter(Boolean) : []
+        keywords: form.keywords ? form.keywords.split(',').map(k => k.trim()).filter(Boolean) : [],
+        target_media_id: form.target_media_id || null
       };
       if (editId) await api.updateRule(editId, payload);
       else await api.createRule(payload);
@@ -46,8 +62,9 @@ export default function Rules() {
   };
 
   const startEdit = (r) => {
-    setForm({ account_id: r.account_id, name: r.name, trigger_type: r.trigger_type, keywords: Array.isArray(r.keywords) ? r.keywords.join(', ') : '', action_type: r.action_type, comment_template: r.comment_template || '', dm_template: r.dm_template || '' });
+    setForm({ account_id: r.account_id, name: r.name, trigger_type: r.trigger_type, keywords: Array.isArray(r.keywords) ? r.keywords.join(', ') : '', action_type: r.action_type, comment_template: r.comment_template || '', dm_template: r.dm_template || '', target_media_id: r.target_media_id || '' });
     setEditId(r.id); setShowForm(true);
+    loadMedia(r.account_id);
   };
 
   const accountName = (id) => {
@@ -78,7 +95,7 @@ export default function Rules() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Account</label>
-              <select className="input" value={form.account_id} onChange={e => setForm({ ...form, account_id: e.target.value })}>
+              <select className="input" value={form.account_id} onChange={e => { setForm({ ...form, account_id: e.target.value, target_media_id: '' }); loadMedia(e.target.value); }}>
                 <option value="">Select account...</option>
                 {accounts.map(a => <option key={a.id} value={a.id}>{a.platform === 'instagram' ? 'Instagram' : 'TikTok'} @{a.username}</option>)}
               </select>
@@ -102,6 +119,60 @@ export default function Rules() {
                 <option value="both">Reply + Send DM</option>
               </select>
             </div>
+            {/* Post Picker */}
+            {form.account_id && accounts.find(a => a.id === form.account_id)?.platform === 'instagram' && (
+              <div className="sm:col-span-2">
+                <label className="label flex items-center gap-2">
+                  <Image size={14} />
+                  Target Post <span className="text-text-muted font-normal">(optional - leave empty for all posts)</span>
+                </label>
+                {mediaLoading ? (
+                  <div className="flex items-center gap-2 text-text-muted text-sm py-4">
+                    <Loader2 size={16} className="animate-spin" /> Loading posts...
+                  </div>
+                ) : media.length === 0 ? (
+                  <div className="text-text-muted text-sm py-2">No posts found or unable to fetch posts.</div>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-64 overflow-y-auto p-1">
+                    {/* All Posts option */}
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, target_media_id: '' })}
+                      className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center text-xs transition-all ${!form.target_media_id ? 'border-accent-purple bg-accent-purple/20 text-accent-purple' : 'border-border bg-bg-tertiary text-text-muted hover:border-text-muted'}`}
+                    >
+                      <Zap size={18} className="mb-1" />
+                      All Posts
+                    </button>
+                    {media.map(post => (
+                      <button
+                        type="button"
+                        key={post.id}
+                        onClick={() => setForm({ ...form, target_media_id: post.id })}
+                        className={`aspect-square rounded-lg border-2 overflow-hidden relative group transition-all ${form.target_media_id === post.id ? 'border-accent-purple ring-2 ring-accent-purple/40' : 'border-border hover:border-text-muted'}`}
+                      >
+                        <img
+                          src={post.media_type === 'VIDEO' ? post.thumbnail_url : post.media_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                        {form.target_media_id === post.id && (
+                          <div className="absolute inset-0 bg-accent-purple/30 flex items-center justify-center">
+                            <Check size={24} className="text-white drop-shadow-lg" />
+                          </div>
+                        )}
+                        {post.caption && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5 text-[10px] text-white truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                            {post.caption.substring(0, 40)}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {form.trigger_type === 'keyword' && (
               <div className="sm:col-span-2">
                 <label className="label">Keywords (comma-separated)</label>
@@ -157,7 +228,11 @@ export default function Rules() {
                     <span className="badge-blue">{rule.trigger_type === 'any' ? 'Any comment' : 'Keyword'}</span>
                     <span className="badge-blue capitalize">{rule.action_type.replace(/_/g, ' ')}</span>
                   </div>
-                  <div className="text-text-muted text-xs mt-1">{accountName(rule.account_id)}</div>
+                  <div className="text-text-muted text-xs mt-1">
+                    {accountName(rule.account_id)}
+                    {rule.target_media_id && <span className="ml-2 text-accent-purple">• Specific post</span>}
+                    {!rule.target_media_id && <span className="ml-2">• All posts</span>}
+                  </div>
                   {rule.trigger_type === 'keyword' && rule.keywords?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {rule.keywords.map(k => <span key={k} className="bg-bg-tertiary text-text-secondary text-xs px-2 py-0.5 rounded">{k}</span>)}

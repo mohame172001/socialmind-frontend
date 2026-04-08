@@ -20,6 +20,7 @@ export const api = {
   updateAccount: (id, data) => request('PUT', `/accounts/${id}`, data),
   deleteAccount: (id) => request('DELETE', `/accounts/${id}`),
   getAccountStats: (id) => request('GET', `/accounts/${id}/stats`),
+  getAccountMedia: (id) => request('GET', `/accounts/${id}/media`),
 
   // Rules
   getRules: (accountId) => request('GET', `/rules${accountId ? `?account_id=${accountId}` : ''}`),
