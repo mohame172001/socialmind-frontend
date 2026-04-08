@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "npx serve dist --listen $PORT --no-clipboard",
+    "startCommand": "npx serve dist -s --listen $PORT --no-clipboard",
     "healthcheckTimeout": 30
   }
 }
