@@ -7,9 +7,36 @@ async function request(method, path, body = null) {
   };
   if (body) opts.body = JSON.stringify(body);
 
-  const res = await fetch(`${BASE_URL}${path}`, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, opts);
+  } catch (networkErr) {
+    throw new Error('Network error — cannot reach backend. Check your connection.');
+  }
+
+  // Parse response — handle non-JSON gracefully
+  let data;
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`Invalid JSON from server (status ${res.status})`);
+    }
+  } else {
+    // Non-JSON response (HTML from SPA fallback, plain text, etc.)
+    const text = await res.text().catch(() => '');
+    throw new Error(
+      res.ok
+        ? `Unexpected non-JSON response from ${method} ${path}`
+        : `${res.status} ${res.statusText || 'Error'} — ${method} ${path}`
+    );
+  }
+
+  if (!res.ok) {
+    throw new Error(data.error || data.message || `Request failed (${res.status})`);
+  }
+
   return data;
 }
 
@@ -42,6 +69,9 @@ export const api = {
   updateSettings: (data) => request('PUT', '/settings', data),
   testAI: () => request('GET', '/settings/test-ai'),
 
-  // Webhooks info
-  getWebhooks: () => fetch('/webhooks').then(r => r.json()),
+  // Webhooks info (endpoint is at /webhooks, outside /api/)
+  getWebhooks: () => {
+    const backendRoot = BASE_URL.replace(/\/api$/, '');
+    return fetch(`${backendRoot}/webhooks`).then(r => r.json()).catch(() => null);
+  },
 };

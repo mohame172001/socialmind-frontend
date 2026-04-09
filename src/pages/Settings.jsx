@@ -50,6 +50,7 @@ export default function Settings() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const loadSettings = () => {
     api.getSettings().then(data => {
@@ -65,7 +66,7 @@ export default function Settings() {
       }
       setSettings(prev => ({ ...prev, ...regular }));
       setMaskedSecrets(prev => ({ ...prev, ...masked }));
-    });
+    }).catch(err => console.error('[Settings] Failed to load:', err));
   };
 
   const loadStatus = () => {
@@ -78,7 +79,7 @@ export default function Settings() {
   }, []);
 
   const save = async () => {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setSaveError('');
 
     // Build payload: only non-secret settings + non-empty new secrets
     const payload = { ...settings };
@@ -103,8 +104,10 @@ export default function Settings() {
         loadStatus();
         setSaved(false);
       }, 1500);
-    } catch (e) { alert(e.message); }
-    finally { setSaving(false); }
+    } catch (e) {
+      console.error('[Settings] Save failed:', e);
+      setSaveError(e.message);
+    } finally { setSaving(false); }
   };
 
   const testAI = async () => {
@@ -308,6 +311,12 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {saveError && (
+        <div className="bg-red-500/15 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm">
+          <strong>Save failed:</strong> {saveError}
+        </div>
+      )}
 
       <button onClick={save} disabled={saving} className="btn-primary flex items-center gap-2">
         {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : saved ? <Check size={16} /> : <Save size={16} />}

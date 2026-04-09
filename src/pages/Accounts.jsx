@@ -72,7 +72,6 @@ export default function Accounts() {
 
   const connectTikTok = () => {
     if (!settings.tiktok_client_key || settings.tiktok_client_key === '') {
-      alert('Please configure your TikTok Client Key in Settings first.');
       window.location.href = '/settings';
       return;
     }
