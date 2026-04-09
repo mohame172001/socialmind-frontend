@@ -2,10 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Save, FlaskConical, Check, ExternalLink, CheckCircle, XCircle, Shield } from 'lucide-react';
 import { api } from '../lib/api';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
-
-// Keys that are masked by the backend — never send their masked value back
-const MASKED_KEYS = ['anthropic_api_key', 'meta_app_secret', 'tiktok_client_secret'];
+const MASKED_KEYS = ['anthropic_api_key', 'tiktok_client_secret'];
 
 function StatusBadge({ ok, label }) {
   return (
@@ -16,36 +13,38 @@ function StatusBadge({ ok, label }) {
   );
 }
 
+function ReadOnlyRow({ label, value, mono = false }) {
+  return (
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+      <div className="text-xs font-medium text-text-secondary">{label}</div>
+      <div className={`text-sm ${mono ? 'font-mono break-all text-accent-blue' : 'text-text-primary'}`}>
+        {value || 'Not set'}
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
-  // Non-secret settings (safe to display and send back)
   const [settings, setSettings] = useState({
     ai_prompt_template: '',
     min_delay_seconds: '45',
     max_delay_seconds: '120',
     max_replies_per_hour: '30',
     user_cooldown_minutes: '60',
-    meta_app_id: '',
-    meta_login_config_id: '',
     tiktok_client_key: '',
   });
 
-  // Secret fields — only sent if user types a NEW value
   const [secrets, setSecrets] = useState({
     anthropic_api_key: '',
-    meta_app_secret: '',
     tiktok_client_secret: ''
   });
 
-  // Masked display values from backend (e.g. "d0fc...823e")
   const [maskedSecrets, setMaskedSecrets] = useState({
     anthropic_api_key: '',
-    meta_app_secret: '',
     tiktok_client_secret: ''
   });
 
-  // Config status from /api/settings/status
   const [configStatus, setConfigStatus] = useState(null);
-
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
@@ -53,10 +52,10 @@ export default function Settings() {
   const [saveError, setSaveError] = useState('');
 
   const loadSettings = () => {
-    api.getSettings().then(data => {
-      // Separate masked secrets from regular settings
+    api.getSettings().then((data) => {
       const regular = {};
       const masked = {};
+
       for (const [key, value] of Object.entries(data)) {
         if (MASKED_KEYS.includes(key)) {
           masked[key] = value || '';
@@ -64,9 +63,10 @@ export default function Settings() {
           regular[key] = value || '';
         }
       }
-      setSettings(prev => ({ ...prev, ...regular }));
-      setMaskedSecrets(prev => ({ ...prev, ...masked }));
-    }).catch(err => console.error('[Settings] Failed to load:', err));
+
+      setSettings((prev) => ({ ...prev, ...regular }));
+      setMaskedSecrets((prev) => ({ ...prev, ...masked }));
+    }).catch((err) => console.error('[Settings] Failed to load:', err));
   };
 
   const loadStatus = () => {
@@ -79,62 +79,60 @@ export default function Settings() {
   }, []);
 
   const save = async () => {
-    setSaving(true); setSaved(false); setSaveError('');
+    setSaving(true);
+    setSaved(false);
+    setSaveError('');
 
-    // Build payload: only non-secret settings + non-empty new secrets
     const payload = { ...settings };
-
-    // Only include secrets if user typed a new value
     for (const key of MASKED_KEYS) {
       const newVal = secrets[key]?.trim();
-      if (newVal) {
-        payload[key] = newVal;
-      }
-      // If empty → don't include in payload → backend won't overwrite
+      if (newVal) payload[key] = newVal;
     }
 
     try {
-      const result = await api.updateSettings(payload);
+      await api.updateSettings(payload);
       setSaved(true);
-      // Clear secret inputs after save
-      setSecrets({ anthropic_api_key: '', meta_app_secret: '', tiktok_client_secret: '' });
-      // Reload to get fresh masked values and status
+      setSecrets({ anthropic_api_key: '', tiktok_client_secret: '' });
       setTimeout(() => {
         loadSettings();
         loadStatus();
         setSaved(false);
       }, 1500);
-    } catch (e) {
-      console.error('[Settings] Save failed:', e);
-      setSaveError(e.message);
-    } finally { setSaving(false); }
+    } catch (err) {
+      console.error('[Settings] Save failed:', err);
+      setSaveError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const testAI = async () => {
-    setTesting(true); setTestResult(null);
+    setTesting(true);
+    setTestResult(null);
     try {
       const result = await api.testAI();
       setTestResult({ success: true, text: result.sample_reply });
-    } catch (e) {
-      setTestResult({ success: false, text: e.message });
-    } finally { setTesting(false); }
+    } catch (err) {
+      setTestResult({ success: false, text: err.message });
+    } finally {
+      setTesting(false);
+    }
   };
 
-  const set = (k, v) => setSettings(prev => ({ ...prev, [k]: v }));
+  const set = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
 
   const oauthReady = configStatus?.oauth_ready;
-  // Canonical redirect URI from backend (single source of truth) — never construct locally
-  const redirectUri = configStatus?.canonical_redirect_uri || `${BACKEND_URL}/api/oauth/instagram/callback`;
-  const appDomain = configStatus?.canonical_app_domain || '';
+  const accountsConnected = configStatus?.instagram_accounts_connected || 0;
+  const accountsActive = configStatus?.instagram_accounts_active || 0;
+  const integrationSourceLabel = configStatus?.integration_source_label || 'Unknown';
 
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Settings</h1>
-        <p className="text-text-muted text-sm mt-0.5">Configure API credentials and automation settings</p>
+        <p className="text-text-muted text-sm mt-0.5">Keep your automation friendly and your integrations healthy.</p>
       </div>
 
-      {/* ── OAuth Status Banner ── */}
       {configStatus && (
         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${oauthReady
           ? 'bg-green-500/10 border-green-500/30'
@@ -142,71 +140,85 @@ export default function Settings() {
           <Shield size={18} className={oauthReady ? 'text-green-400' : 'text-yellow-400'} />
           <div className="flex-1">
             <div className={`font-medium text-sm ${oauthReady ? 'text-green-400' : 'text-yellow-400'}`}>
-              {oauthReady ? 'OAuth Ready' : 'OAuth Not Configured'}
+              {oauthReady ? 'Instagram integration is ready' : 'Instagram integration needs attention'}
             </div>
-            <div className="flex gap-4 mt-1">
-              <StatusBadge ok={configStatus.meta_app_id?.set} label={`App ID (${configStatus.meta_app_id?.source || 'none'})`} />
-              <StatusBadge ok={configStatus.meta_app_secret?.set} label={`App Secret (${configStatus.meta_app_secret?.source || 'none'})`} />
-              <StatusBadge ok={configStatus.anthropic_api_key?.set} label={`AI Key (${configStatus.anthropic_api_key?.source || 'none'})`} />
+            <div className="flex flex-wrap gap-4 mt-1">
+              <StatusBadge ok={configStatus.meta_app_id?.set} label="App ID saved" />
+              <StatusBadge ok={configStatus.meta_app_secret?.set} label="App Secret saved" />
+              <StatusBadge ok={configStatus.anthropic_api_key?.set} label="AI key ready" />
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Meta / Instagram App ── */}
       <div className="card space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
               <span className="text-white text-xs font-bold">IG</span>
             </div>
-            Meta / Instagram App
+            Instagram Connection
           </h2>
-          <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer"
-            className="text-text-muted hover:text-accent-blue text-xs flex items-center gap-1">
-            Open Meta Dev <ExternalLink size={11} />
-          </a>
+          <a href="/accounts" className="btn-secondary text-sm">Open Accounts</a>
         </div>
 
-        <div className="bg-bg-tertiary rounded-lg p-3 text-xs text-text-muted space-y-1">
-          <div className="font-medium text-text-secondary">Setup:</div>
-          <div>1. Create a Meta App at developers.facebook.com</div>
-          <div>2. Add <strong className="text-text-secondary">Facebook Login</strong> product (or Facebook Login for Business)</div>
-          <div>3. <strong className="text-yellow-400">App Settings → Basic → App Domains</strong>, add:</div>
-          <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{appDomain || '(loading...)'}</code>
-          <div>4. <strong className="text-yellow-400">Facebook Login → Settings → Valid OAuth Redirect URIs</strong>, add:</div>
-          <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{redirectUri}</code>
-          <div>5. If using <strong className="text-text-secondary">Facebook Login for Business</strong>: create a Login Configuration with the redirect URI and scopes, then paste Config ID below</div>
-          <div>6. Paste your App ID and App Secret below</div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="label">App ID (Public)</label>
-            <input className="input font-mono text-sm" placeholder="1234567890"
-              value={settings.meta_app_id} onChange={e => set('meta_app_id', e.target.value)} />
-          </div>
-          <div>
-            <label className="label">App Secret</label>
-            <div className="text-xs mb-1">
-              {maskedSecrets.meta_app_secret
-                ? <span className="text-green-400">Saved: {maskedSecrets.meta_app_secret}</span>
-                : <span className="text-red-400">Not set</span>}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-border bg-bg-tertiary/70 p-4">
+            <div className="text-xs text-text-muted">Status</div>
+            <div className={`mt-1 font-semibold ${oauthReady ? 'text-green-400' : 'text-yellow-400'}`}>
+              {oauthReady ? 'Healthy' : 'Needs attention'}
             </div>
-            <input className="input font-mono text-sm" type="password"
-              placeholder={maskedSecrets.meta_app_secret ? 'Leave empty to keep current' : 'Enter App Secret...'}
-              value={secrets.meta_app_secret}
-              onChange={e => setSecrets(prev => ({ ...prev, meta_app_secret: e.target.value }))} />
+            <div className="text-xs text-text-muted mt-2">
+              SocialMind uses the saved Meta app connection automatically.
+            </div>
           </div>
-          <div className="sm:col-span-2">
-            <label className="label">Login Config ID <span className="text-text-muted font-normal">(Facebook Login for Business only — leave empty for standard Facebook Login)</span></label>
-            <input className="input font-mono text-sm" placeholder="Optional — e.g. 123456789012345"
-              value={settings.meta_login_config_id} onChange={e => set('meta_login_config_id', e.target.value)} />
+
+          <div className="rounded-xl border border-border bg-bg-tertiary/70 p-4">
+            <div className="text-xs text-text-muted">Connected accounts</div>
+            <div className="mt-1 font-semibold text-text-primary">{accountsConnected}</div>
+            <div className="text-xs text-text-muted mt-2">
+              {accountsActive} active right now
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-bg-tertiary/70 p-4">
+            <div className="text-xs text-text-muted">App integration source</div>
+            <div className="mt-1 font-semibold text-text-primary">{integrationSourceLabel}</div>
+            <div className="text-xs text-text-muted mt-2">
+              Normal users do not need to re-enter app credentials here.
+            </div>
           </div>
         </div>
+
+        {!oauthReady && (
+          <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
+            An admin needs to add the Instagram app credentials in the backend environment once. After that, users can reconnect Instagram from the Accounts page without typing App ID or App Secret again.
+          </div>
+        )}
+
+        <details className="rounded-xl border border-border bg-bg-tertiary/40 p-4">
+          <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
+            <div>
+              <div className="font-medium text-text-primary">Advanced / Admin</div>
+              <div className="text-xs text-text-muted mt-0.5">Read-only technical details for troubleshooting</div>
+            </div>
+            <ExternalLink size={14} className="text-text-muted" />
+          </summary>
+
+          <div className="mt-4 space-y-4">
+            <ReadOnlyRow label="Runtime source of truth" value={configStatus?.integration_source_label} />
+            <ReadOnlyRow label="Meta App ID" value={configStatus?.meta_app_id_display} mono />
+            <ReadOnlyRow label="Meta App Secret" value={configStatus?.meta_app_secret_display} mono />
+            <ReadOnlyRow label="Redirect URI" value={configStatus?.canonical_redirect_uri} mono />
+            <ReadOnlyRow label="App domain" value={configStatus?.canonical_app_domain} mono />
+            <ReadOnlyRow label="Webhook URL" value={configStatus?.canonical_webhook_url} mono />
+            <div className="rounded-lg border border-border bg-bg-primary px-3 py-2 text-xs text-text-muted">
+              These values are read-only here. Change them in backend environment variables, not in normal settings.
+            </div>
+          </div>
+        </details>
       </div>
 
-      {/* ── TikTok App ── */}
       <div className="card space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-text-primary flex items-center gap-2">
@@ -222,7 +234,7 @@ export default function Settings() {
         </div>
 
         <div className="bg-bg-tertiary rounded-lg p-3 text-xs text-text-muted space-y-1">
-          <div className="font-medium text-text-secondary">Setup:</div>
+          <div className="font-medium text-text-secondary">Optional setup:</div>
           <div>1. Create an app at developers.tiktok.com</div>
           <div>2. Add redirect URI: your backend URL + <code className="bg-bg-primary px-1 rounded">/api/oauth/tiktok/callback</code></div>
           <div>3. Paste your Client Key and Client Secret below</div>
@@ -232,7 +244,7 @@ export default function Settings() {
           <div>
             <label className="label">Client Key (Public)</label>
             <input className="input font-mono text-sm" placeholder="aw1234..."
-              value={settings.tiktok_client_key} onChange={e => set('tiktok_client_key', e.target.value)} />
+              value={settings.tiktok_client_key} onChange={(e) => set('tiktok_client_key', e.target.value)} />
           </div>
           <div>
             <label className="label">Client Secret</label>
@@ -244,12 +256,11 @@ export default function Settings() {
             <input className="input font-mono text-sm" type="password"
               placeholder={maskedSecrets.tiktok_client_secret ? 'Leave empty to keep current' : 'Enter Client Secret...'}
               value={secrets.tiktok_client_secret}
-              onChange={e => setSecrets(prev => ({ ...prev, tiktok_client_secret: e.target.value }))} />
+              onChange={(e) => setSecrets((prev) => ({ ...prev, tiktok_client_secret: e.target.value }))} />
           </div>
         </div>
       </div>
 
-      {/* ── AI Config ── */}
       <div className="card space-y-4">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-accent-purple/20 flex items-center justify-center">
@@ -268,12 +279,12 @@ export default function Settings() {
           <input className="input font-mono text-sm" type="password"
             placeholder={maskedSecrets.anthropic_api_key ? 'Leave empty to keep current' : 'sk-ant-...'}
             value={secrets.anthropic_api_key}
-            onChange={e => setSecrets(prev => ({ ...prev, anthropic_api_key: e.target.value }))} />
+            onChange={(e) => setSecrets((prev) => ({ ...prev, anthropic_api_key: e.target.value }))} />
         </div>
 
         <div>
           <label className="label">AI Reply Prompt Template</label>
-          <textarea className="input" rows={3} value={settings.ai_prompt_template} onChange={e => set('ai_prompt_template', e.target.value)} />
+          <textarea className="input" rows={3} value={settings.ai_prompt_template} onChange={(e) => set('ai_prompt_template', e.target.value)} />
           <div className="text-text-muted text-xs mt-1">Variables: <code className="bg-bg-tertiary px-1 rounded">{'{{comment}}'}</code> <code className="bg-bg-tertiary px-1 rounded">{'{{username}}'}</code></div>
         </div>
 
@@ -289,25 +300,24 @@ export default function Settings() {
         </button>
       </div>
 
-      {/* ── Anti-Spam ── */}
       <div className="card space-y-4">
         <h2 className="font-semibold text-text-primary">Anti-Spam Controls</h2>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Min Delay (seconds)</label>
-            <input className="input" type="number" min="10" value={settings.min_delay_seconds} onChange={e => set('min_delay_seconds', e.target.value)} />
+            <input className="input" type="number" min="10" value={settings.min_delay_seconds} onChange={(e) => set('min_delay_seconds', e.target.value)} />
           </div>
           <div>
             <label className="label">Max Delay (seconds)</label>
-            <input className="input" type="number" min="10" value={settings.max_delay_seconds} onChange={e => set('max_delay_seconds', e.target.value)} />
+            <input className="input" type="number" min="10" value={settings.max_delay_seconds} onChange={(e) => set('max_delay_seconds', e.target.value)} />
           </div>
           <div>
             <label className="label">Max Replies / Hour</label>
-            <input className="input" type="number" min="1" value={settings.max_replies_per_hour} onChange={e => set('max_replies_per_hour', e.target.value)} />
+            <input className="input" type="number" min="1" value={settings.max_replies_per_hour} onChange={(e) => set('max_replies_per_hour', e.target.value)} />
           </div>
           <div>
             <label className="label">User Cooldown (minutes)</label>
-            <input className="input" type="number" min="5" value={settings.user_cooldown_minutes} onChange={e => set('user_cooldown_minutes', e.target.value)} />
+            <input className="input" type="number" min="5" value={settings.user_cooldown_minutes} onChange={(e) => set('user_cooldown_minutes', e.target.value)} />
           </div>
         </div>
       </div>
@@ -320,7 +330,7 @@ export default function Settings() {
 
       <button onClick={save} disabled={saving} className="btn-primary flex items-center gap-2">
         {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : saved ? <Check size={16} /> : <Save size={16} />}
-        {saved ? 'Saved!' : 'Save All Settings'}
+        {saved ? 'Saved!' : 'Save Settings'}
       </button>
     </div>
   );
