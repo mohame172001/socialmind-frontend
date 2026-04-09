@@ -53,8 +53,7 @@ export default function Accounts() {
   useEffect(() => {
     load();
     api.getSettings().then(setSettings).catch(console.error);
-    // Fetch config status (checks ENV vars + DB)
-    fetch(`${BACKEND_URL}/api/settings/status`).then(r => r.json()).then(setConfigStatus).catch(console.error);
+    api.getConfigStatus().then(setConfigStatus).catch(console.error);
   }, []);
 
   const oauthReady = configStatus?.oauth_ready;

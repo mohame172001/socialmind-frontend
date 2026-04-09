@@ -69,7 +69,7 @@ export default function Settings() {
   };
 
   const loadStatus = () => {
-    fetch(`${BACKEND_URL}/api/settings/status`).then(r => r.json()).then(setConfigStatus).catch(console.error);
+    api.getConfigStatus().then(setConfigStatus).catch(console.error);
   };
 
   useEffect(() => {
@@ -120,7 +120,9 @@ export default function Settings() {
   const set = (k, v) => setSettings(prev => ({ ...prev, [k]: v }));
 
   const oauthReady = configStatus?.oauth_ready;
-  const redirectUri = `${BACKEND_URL || window.location.origin}/api/oauth/instagram/callback`;
+  // Canonical redirect URI from backend (single source of truth) — never construct locally
+  const redirectUri = configStatus?.canonical_redirect_uri || `${BACKEND_URL}/api/oauth/instagram/callback`;
+  const appDomain = configStatus?.canonical_app_domain || '';
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -168,7 +170,7 @@ export default function Settings() {
           <div>1. Create a Meta App at developers.facebook.com</div>
           <div>2. Add <strong className="text-text-secondary">Facebook Login</strong> product (or Facebook Login for Business)</div>
           <div>3. <strong className="text-yellow-400">App Settings → Basic → App Domains</strong>, add:</div>
-          <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{new URL(redirectUri).hostname}</code>
+          <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{appDomain || '(loading...)'}</code>
           <div>4. <strong className="text-yellow-400">Facebook Login → Settings → Valid OAuth Redirect URIs</strong>, add:</div>
           <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{redirectUri}</code>
           <div>5. If using <strong className="text-text-secondary">Facebook Login for Business</strong>: create a Login Configuration with the redirect URI and scopes, then paste Config ID below</div>
