@@ -25,6 +25,7 @@ export default function Settings() {
     max_replies_per_hour: '30',
     user_cooldown_minutes: '60',
     meta_app_id: '',
+    meta_login_config_id: '',
     tiktok_client_key: '',
   });
 
@@ -165,10 +166,13 @@ export default function Settings() {
         <div className="bg-bg-tertiary rounded-lg p-3 text-xs text-text-muted space-y-1">
           <div className="font-medium text-text-secondary">Setup:</div>
           <div>1. Create a Meta App at developers.facebook.com</div>
-          <div>2. Add "Facebook Login" product</div>
-          <div>3. Set Valid OAuth Redirect URI to:</div>
+          <div>2. Add <strong className="text-text-secondary">Facebook Login</strong> product (or Facebook Login for Business)</div>
+          <div>3. <strong className="text-yellow-400">App Settings → Basic → App Domains</strong>, add:</div>
+          <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{new URL(redirectUri).hostname}</code>
+          <div>4. <strong className="text-yellow-400">Facebook Login → Settings → Valid OAuth Redirect URIs</strong>, add:</div>
           <code className="block bg-bg-primary px-2 py-1 rounded text-accent-blue select-all break-all">{redirectUri}</code>
-          <div>4. Paste your App ID and App Secret below</div>
+          <div>5. If using <strong className="text-text-secondary">Facebook Login for Business</strong>: create a Login Configuration with the redirect URI and scopes, then paste Config ID below</div>
+          <div>6. Paste your App ID and App Secret below</div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -188,6 +192,11 @@ export default function Settings() {
               placeholder={maskedSecrets.meta_app_secret ? 'Leave empty to keep current' : 'Enter App Secret...'}
               value={secrets.meta_app_secret}
               onChange={e => setSecrets(prev => ({ ...prev, meta_app_secret: e.target.value }))} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label">Login Config ID <span className="text-text-muted font-normal">(Facebook Login for Business only — leave empty for standard Facebook Login)</span></label>
+            <input className="input font-mono text-sm" placeholder="Optional — e.g. 123456789012345"
+              value={settings.meta_login_config_id} onChange={e => set('meta_login_config_id', e.target.value)} />
           </div>
         </div>
       </div>
